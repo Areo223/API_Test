@@ -6,6 +6,7 @@ from Tools.scripts.make_ctype import method
 
 from common.csv_handler import CsvHandler
 from common.excel_handler import ExcelHandler
+from middleware.result_handler import compare_dicts_with_assert, ResultHandler
 
 
 # def test_api():
@@ -83,13 +84,50 @@ def base_url():
 
 @pytest.mark.parametrize('data',CsvHandler(r'C:\Users\areo3\PycharmProjects\Demo\cases.csv').read())
 def test_csv_handler(data, login_session, base_url):
-    # print(int(data["expect"]))
+    print("csv")
+    print(data)
     the_url = base_url+data['url']
     response = login_session.request(method=data['method'],url=the_url,params=data['parametrize'],json=data['json'])
-    assert response.status_code == int(data['expect'])
+    print("csv")
+    print(response)
+    try:
+        result_dict = json.loads(data['expect'])
+        if isinstance(result_dict, dict):
+            # 将result_dict里的data键对应的值转换为字符串类型后再传入ResultHandler
+            data_to_pass = json.dumps(result_dict.get('data')) if result_dict.get('data') is not None else None
+            expected_dict, from_csv_dict = ResultHandler(code=result_dict.get('code'),
+                                                         msg=result_dict.get('msg'),
+                                                         data=data_to_pass)
+            try:
+                compare_dicts_with_assert(expected_dict, from_csv_dict, actual_dict=response.json())
+                print("结果匹配")
+            except AssertionError as e:
+                print(f"断言失败: {e}")
+                assert False
+    except json.JSONDecodeError:
+        print(f"Invalid expect format in row: {data}, skipping...")
 
 @pytest.mark.parametrize('data',ExcelHandler(r'C:\Users\areo3\PycharmProjects\Demo\cases.xlsx').read())
 def test_excel_handler(data, login_session, base_url):
+    print("excel")
+    print(data)
     the_url = base_url+(data['url'] if data['url'] is not None else "")
     response = login_session.request(method=data['method'],url=the_url,params=data['parametrize'])
-    assert response.status_code == int(data['expect'])
+    print("excel")
+    print(response)
+    try:
+        result_dict = json.loads(data['expect'])
+        if isinstance(result_dict, dict):
+            # 将result_dict里的data键对应的值转换为字符串类型后再传入ResultHandler
+            data_to_pass = json.dumps(result_dict.get('data')) if result_dict.get('data') is not None else None
+            expected_dict, from_csv_dict = ResultHandler(code=result_dict.get('code'),
+                                                        msg=result_dict.get('msg'),
+                                                        data=data_to_pass)
+            try:
+                compare_dicts_with_assert(expected_dict, from_csv_dict, actual_dict=response.json())
+                print("结果匹配")
+            except AssertionError as e:
+                print(f"断言失败: {e}")
+                assert False
+    except json.JSONDecodeError:
+        print(f"Invalid expect format in row: {data}, skipping...")

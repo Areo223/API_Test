@@ -1,5 +1,5 @@
 description,method,url,parametrize,json,expect
-查找,get,"",tag=tag,,200
+查找,get,"",tag=tag,,"{""code"": 1, ""msg"": ""success"", ""data"": {""content"": [], ""totalPages"": 0, ""totalElements"": 0}}"
 新增,post,"","","{
     ""text"": ""test_text"",
     ""tag"": [
@@ -10,8 +10,8 @@ description,method,url,parametrize,json,expect
             ""tagContent"": ""test_tagContent2""
         }
     ]
-}",200
-删除,delete,/186,"",,200
+}","{""code"": 1, ""msg"": ""success"", ""data"": {""content"": [], ""totalPages"": 0, ""totalElements"": 0}}"
+删除,delete,/186,"",,"{""code"": 0, ""msg"": ""success"", ""data"": {""content"": [], ""totalPages"": 0, ""totalElements"": 0}}"
 修改,put,"","","{
     ""id"": ""64"",
     ""text"": ""1234567891111111111111111111"",
@@ -23,8 +23,12 @@ description,method,url,parametrize,json,expect
             ""tagContent"": ""新的tag""
         }
     ]
-}",200
+}","{""code"": 0}"
 登录,post,/login,"","{
     ""phoneNumber"":""12345678902"",
     ""password"":""12345678""
-}",200
+}","{""code"": 0, ""msg"": ""success"", ""data"": {
+    ""content"": [""item1"", ""item2""],
+    ""totalPages"": 1,
+    ""totalElements"": 2
+}}"
