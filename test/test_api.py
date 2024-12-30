@@ -7,6 +7,7 @@ from Tools.scripts.make_ctype import method
 from common.csv_handler import CsvHandler
 from common.excel_handler import ExcelHandler
 from middleware.result_handler import compare_dicts_with_assert, ResultHandler
+from setting import config
 
 
 # def test_api():
@@ -26,23 +27,23 @@ def login_session(session):
     token = response_dict["token"]
     session.headers.update({"token": token})
     return session
-#
-# @pytest.fixture
-# def new_diary_session(login_session):
-#     data={
-#     "text": "test_text",
-#     "tag": [
-#             {
-#                 "tagContent": "test_tagContent1"
-#             },
-#             {
-#                 "tagContent": "test_tagContent2"
-#             }
-#         ]
-#     }
-#     response = login_session.post('http://localhost:8080/diary',json=data)
-#     assert response.status_code == 200
-#     return login_session
+
+@pytest.fixture
+def new_diary_session(login_session):
+    data={
+    "text": "test_text",
+    "tag": [
+            {
+                "tagContent": "test_tagContent1"
+            },
+            {
+                "tagContent": "test_tagContent2"
+            }
+        ]
+    }
+    response = login_session.post('http://localhost:8080/diary',json=data)
+    assert response.status_code == 200
+    return login_session
 #
 # @pytest.fixture
 # def list_diaries_session(new_diary_session):
@@ -80,7 +81,7 @@ def login_session(session):
 
 @pytest.fixture
 def base_url():
-    return "http://localhost:8080/diary"
+    return config.base_url
 
 @pytest.mark.parametrize('data',CsvHandler(r'C:\Users\areo3\PycharmProjects\Demo\cases.csv').read())
 def test_csv_handler(data, login_session, base_url):
