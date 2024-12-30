@@ -26,7 +26,11 @@ class ExcelHandler():
         for row in rows[1:]:
             row_data = []
             for cell in row:
-                row_data.append(cell.value)
+                cell_value = cell.value
+                if isinstance(cell_value, str):
+                    # 数据清洗：将 _x000D_ 替换为空字符串，以修正换行符问题
+                    cell_value = cell_value.replace('_x000D_', '')
+                row_data.append(cell_value)
                 data_dict = dict(zip(self.header(sheet_name), row_data))
             data.append(data_dict)
         return data
