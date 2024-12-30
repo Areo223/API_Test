@@ -1,9 +1,9 @@
-技术栈:pytest+allure+requests+Flask
+# 技术栈:pytest+allure+requests+Flask
 
 目前支持Excel和cvs的读取
 
 
-#仍待完善点
+# 仍待完善点:
 
 1.常量配置表(完善中)
 
