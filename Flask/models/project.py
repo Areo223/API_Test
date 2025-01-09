@@ -1,9 +1,8 @@
 from sqlalchemy.orm import relationship
 
+from Flask.exts import db
+from Flask.secondary.secondary import project_module, project_user, project_caseset
 from base.base_models import BaseModel
-from exts import db
-from secondary.secondary import project_module, project_user, project_caseset
-
 
 
 class Project(BaseModel):

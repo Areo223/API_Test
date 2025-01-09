@@ -115,15 +115,21 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 
 # 初始化文件,创建Flask应用
 from flask import Flask
-from. import view
+
+from blueprint import api_test
 from exts import init_exts
 
-
 def create_app():
+    """
+    创建并配置Flask应用
+
+    :return: 配置好的Flask应用实例
+    """
+    # 创建Flask应用实例
     app = Flask(__name__)
 
     # 注册蓝图
-    app.register_blueprint(blueprint=view.blue)
+    app.register_blueprint(blueprint=api_test)
 
     # 配置数据库
     HOSTNAME = "127.0.0.1"
@@ -131,10 +137,13 @@ def create_app():
     USERNAME = "root"
     PASSWORD = "1234"
     DATABASE = "api_test"
+    # 构建数据库连接字符串
     app.config[
         'SQLALCHEMY_DATABASE_URI'] = f"mysql+pymysql://{USERNAME}:{PASSWORD}@{HOSTNAME}:{PORT}/{DATABASE}?charset=utf8"
 
     # 初始化插件
     init_exts(app=app)
+
+    # 加载模型
 
     return app

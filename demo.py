@@ -60,3 +60,33 @@ from common.csv_handler import CsvHandler
 #             print("���ǿ����ļ�")
 #             print("����������ip�ǣ�", env["dev"])
 #             # print(env)
+
+from sqlalchemy import create_engine, MetaData, Table
+from sqlalchemy.exc import OperationalError
+
+# 连接到数据库
+HOSTNAME = "127.0.0.1"
+PORT = "3306"
+USERNAME = "root"
+PASSWORD = "1234"
+DATABASE = "api_test"
+engine = create_engine(f"mysql+pymysql://{USERNAME}:{PASSWORD}@{HOSTNAME}:{PORT}/{DATABASE}")
+
+# 创建元数据对象
+metadata = MetaData()
+
+# 绑定元数据到引擎
+metadata.bind = engine
+
+# 获取 user 表对象
+user_table = Table('user', metadata, autoload=True)
+
+# 获取所有引用 user 表的外键约束
+foreign_keys = user_table.foreign_keys
+
+# 遍历外键约束并删除它们
+for fk in foreign_keys:
+    fk.drop(engine)
+
+# 删除 user 表
+user_table.drop(engine)

@@ -1,8 +1,8 @@
 from sqlalchemy.orm import relationship
 
+from Flask.exts import db
+from Flask.secondary.secondary import caseset_case
 from base.base_models import BaseModel
-from exts import db
-from secondary.secondary import caseset_case
 
 
 class CaseSet(BaseModel):

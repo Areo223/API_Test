@@ -1,5 +1,5 @@
+from Flask.exts import db
 from base.base_models import StatusFiledModel
-from exts import db
 
 
 class User(StatusFiledModel):

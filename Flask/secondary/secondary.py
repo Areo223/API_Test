@@ -1,6 +1,6 @@
 from sqlalchemy import Table, Column
 
-from exts import db
+from Flask.exts import db
 
 # 项目和用户的关联表
 project_user = Table('project_user', db.Model.metadata,

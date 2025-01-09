@@ -2,7 +2,7 @@ from datetime import datetime
 
 from flask import g
 from flask_sqlalchemy import query as base_query
-from exts import db
+from Flask.exts import db
 
 
 
