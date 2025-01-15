@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Flask (Flask/app.py)" type="Python.FlaskServer" nameIsGenerated="true">
+  <configuration default="false" name="Flask" type="Python.FlaskServer" nameIsGenerated="true">
     <option name="flaskDebug" value="true" />
     <module name="ApiTest" />
     <option name="target" value="$PROJECT_DIR$/Flask/app.py" />
