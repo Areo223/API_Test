@@ -4,6 +4,7 @@ from apps.base_model import db
 from apps.hooks.after_request import register_after_hooks
 from apps.hooks.before_request import register_before_hooks
 from apps.hooks.error_handler import register_errorhandler_hooks
+from config import _SystemConfig
 from utils.util.json_util import CustomEncoder
 from utils.view import restful
 
@@ -14,7 +15,7 @@ def create_app():
     # 注册自定义JSON编码器
     app.json_encoder = CustomEncoder
     # 加载配置
-    app.config.from_object('config')
+    app.config.from_object(_SystemConfig)
     # 将db对象绑定到app对象上
     app.db=db
     # 将restful对象绑定到app对象上

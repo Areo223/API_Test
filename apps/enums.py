@@ -20,6 +20,12 @@ class AuthType(str, BaseEnum):
     permission = "permission"
     admin = "admin"
     not_auth = "not_auth"
+
+class UserRoleEnum(str, BaseEnum):
+    """ 用户角色 """
+    ADMIN = "admin"
+    USER = "user"
+
 class DataStatusEnum(str, BaseEnum):
     """ 数据状态枚举 """
     ENABLE = 1
@@ -59,3 +65,18 @@ class ProjectLastPullStatusEnum(str, BaseEnum):
     SUCCESS = 2
     FAIL = 0
     NOT_PULL = 1
+
+class CaseStatusEnum(int, BaseEnum):
+    """ 测试用例状态 """
+    NOT_DEBUG_AND_NOT_RUN = 0  # 未调试-不执行
+    DEBUG_PASS_AND_RUN = 1  # 调试通过-要执行
+    DEBUG_PASS_AND_NOT_RUN = 2  # 调试通过-不执行
+    NOT_DEBUG_PASS_AND_NOT_RUN = 3  # 调试不通过-不执行
+
+class ApiCaseSuiteTypeEnum(str, BaseEnum):
+    """ 用例集类型 """
+    api = "api"  # 单接口用例集
+    base = "base"  # 基础用例集
+    quote = "quote"  # 引用用例集
+    process = "process"  # 流程用例集
+    make_data = "make_data"  # 造数据用例集

@@ -5,3 +5,5 @@
 /.run
 /__pycache__
 /__pycache__
+*.md
+/migrations

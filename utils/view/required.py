@@ -15,7 +15,7 @@ def parse_access_token(token):
         bool: 如果令牌有效且未过期，则返回 True；否则返回 False。
     """
     try:
-        data = jwt.decode(token, app.config["SECRET_KEY"], algorithms=["HS256"])
+        data = jwt.decode(token, app.config["ACCESS_TOKEN_SECRET_KEY"], algorithms=["HS256"])
         g.user_id = data.get("id")
         g.user_name = data.get("name")
         g.api_permissions = data.get("permissions")
@@ -39,7 +39,7 @@ def check_login_and_permissions():
     request_url = request.path.split("/",2)[-1]
     auth_type = app.url_required_map.get(f'{request.method}/{request_url}')
 
-    parse_access_token(request.headers.get("token"))
+    parse_access_token(request.headers.get("access_token"))
 
     if auth_type != AuthType.not_auth:
         if auth_type == AuthType.login:

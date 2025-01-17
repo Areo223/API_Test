@@ -1,15 +1,16 @@
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Self, Dict, Optional
+from typing import Any, Self, Dict, Optional, Union
 
 from flask import g,request
 from flask_sqlalchemy import SQLAlchemy as _SQLAlchemy
 from flask_sqlalchemy.query import Query as BaseQuery
 from sqlalchemy import MetaData, Integer, String, DateTime, JSON, Text
 from sqlalchemy.orm import Mapped, mapped_column
+
 from werkzeug.security import generate_password_hash
 
-from apps.enums import DataStatusEnum, ApiBodyTypeEnum
+from apps.enums import DataStatusEnum, ApiBodyTypeEnum, CaseStatusEnum, ApiCaseSuiteTypeEnum
 from utils.util.json_util import JsonUtil
 
 
@@ -103,7 +104,68 @@ class BaseModel(db.Model,JsonUtil):
                 if hasattr(self, key):
                     setattr(self, key, value)
 
+    @classmethod
+    def model_create_and_get(cls, data_dict: dict):
+        """ 创建并返回数据，会多一次查询 """
+        # 执行创建数据
+        cls.model_create(data_dict)
+        query_filter = {}
+        if "name" in data_dict:
+            query_filter["name"] = data_dict["name"]
+        if "sso_user_id" in data_dict:
+            query_filter["sso_user_id"] = data_dict["sso_user_id"]
+        if "module_id" in data_dict:
+            query_filter["module_id"] = data_dict["module_id"]
+        if "parent" in data_dict:
+            query_filter["parent"] = data_dict["parent"]
+        if "project_id" in data_dict:
+            query_filter["project_id"] = data_dict["project_id"]
+        if "batch_id" in data_dict:
+            query_filter["batch_id"] = data_dict["batch_id"]
+        if "report_id" in data_dict:
+            query_filter["report_id"] = data_dict["report_id"]
+        if "report_case_id" in data_dict:
+            query_filter["report_case_id"] = data_dict["report_case_id"]
+        if "url" in data_dict:
+            query_filter["url"] = data_dict["url"]
+        if "method" in data_dict:
+            query_filter["method"] = data_dict["method"]
+        if "project" in data_dict:
+            query_filter["project"] = data_dict["project"]
+        # 返回查询到的第一个ORM对象
+        return cls.query.filter_by(**query_filter).order_by(cls.id.desc()).first()
 
+    @classmethod
+    def model_batch_create(cls, data_list: list):
+        """
+        批量插入
+        传入的data_list 是一个列表，列表中的每个元素都是一个字典，字典要对应model
+        """
+        with db.auto_commit():
+            obj_list = []
+            for data_dict in data_list:
+                # 格式化插入数据
+                insert_dict = cls.format_insert_data(data_dict)
+                obj_list.append(cls(**insert_dict))
+            # 批量添加
+            db.session.add_all(obj_list)
+
+    @classmethod
+    def get_first(cls,**kwargs):
+        return cls.query.filter_by(**kwargs).first()
+
+    @classmethod
+    def delete_by_id(cls, data_id):
+        """ 根据id删除数据 """
+        # 如果是int类型，就删除单条数据
+        if isinstance(data_id, int):
+            cls.query.filter(cls.id == data_id).delete()
+        # 如果是list类型，就批量删除
+        elif isinstance(data_id, list):
+            cls.query.filter(cls.id.in_(data_id)).delete()
+
+class BaseUser(BaseModel):
+    __abstract__ = True
 class StatusFiled(BaseModel):
     __abstract__ = True
     status:Mapped[int] = mapped_column(Integer(),nullable=True,default=DataStatusEnum.ENABLE.value,comment="状态,1:启用,0:禁用")
@@ -179,6 +241,28 @@ class ExtractsFiled(BaseModel):
         "update_to_header":None
     }],comment="提取参数")
 
+class VariablesFiled(BaseModel):
+    __abstract__ = True
+    variables:Mapped[list] = mapped_column(JSON,default=[
+        {
+            "key":None,
+            "value":None,
+            "remark":None,
+            "data_type":None
+        }
+    ],comment="公共参数")
+
+class SkipIfFiled(BaseModel):
+    __abstract__ = True
+    skip_if:Mapped[list] = mapped_column(JSON,default=[{
+        "expect":None,
+        "comparator":None,
+        "data_source":None,
+        "data_type":None,
+        "skip_type":None,
+        "check_value":None
+    }],comment="跳过条件")
+
 class BaseModule(NumFiled):
     __abstract__ = True
     name:Mapped[str] = mapped_column(String(255),nullable=False,comment="名称")
@@ -190,3 +274,55 @@ class BaseProject(StatusFiled,NumFiled):
     name:Mapped[str] = mapped_column(String(255),unique=True,nullable=False,comment="名称")
     manager:Mapped[int] = mapped_column(Integer(),nullable=False,comment="负责人")
     business_id:Mapped[int] = mapped_column(Integer(),nullable=False,index=True,comment="业务线")
+
+class BaseCase(VariablesFiled,StatusFiled,NumFiled,SkipIfFiled):
+    __abstract__ = True
+
+    name: Mapped[str] = mapped_column(String(255), nullable=False, comment="名称")
+    desc: Mapped[str] = mapped_column(Text(), nullable=False, comment="用例描述")
+    status: Mapped[int] = mapped_column(
+        Integer(), default=CaseStatusEnum.NOT_DEBUG_AND_NOT_RUN.value,
+        comment="用例调试状态，0未调试-不执行，1调试通过-要执行，2调试通过-不执行，3调试不通过-不执行，默认未调试-不执行")
+    run_times: Mapped[int] = mapped_column(Integer(), default=1, comment="执行次数，默认执行1次")
+    output: Mapped[list] = mapped_column(JSON, default=[], comment="用例出参（步骤提取的数据）")
+    suite_id: Mapped[int] = mapped_column(Integer(), nullable=False, index=True, comment="所属的用例集id")
+
+class BaseStep(NumFiled,FuncFiled,StatusFiled,SkipIfFiled):
+    __abstract__ = True
+
+    run_times: Mapped[int] = mapped_column(Integer(), default=1, comment="执行次数，默认执行1次")
+    name = db.Column(db.String(255), nullable=False, comment="步骤名称")
+    skip_on_fail: Mapped[int] = mapped_column(
+        Integer(), default=1, nullable=True,
+        comment="当用例有失败的步骤时，是否跳过此步骤，1跳过，0不跳过，默认跳过")
+    data_driver: Mapped[list] = mapped_column(JSON, default=[], comment="数据驱动，若此字段有值，则走数据驱动的解析")
+    quote_case: Mapped[int] = mapped_column(Integer(), nullable=True, default=None, comment="引用用例的id")
+    case_id: Mapped[int] = mapped_column(Integer(), nullable=False, index=True, comment="步骤所在的用例的id")
+
+class BaseCaseSuite(NumFiled):
+    __abstract__ = True
+
+    name:Mapped[str] = mapped_column(String(255),nullable=False,comment="名称")
+    suite_type: Mapped[ApiCaseSuiteTypeEnum] = mapped_column(
+        default=ApiCaseSuiteTypeEnum.base.value,
+        comment="用例集类型，base: 基础用例集，api: 单接口用例集，process: 流程用例集，make_data: 造数据用例集")
+    parent: Mapped[int] = mapped_column(Integer(), nullable=True, default=None, comment="上一级用例集id")
+    project_id:Mapped[int] = mapped_column(Integer(),nullable=False,index=True,comment="项目ID")
+
+class BaseReport(BaseModel):
+    __abstract__ = True
+
+    name: Mapped[str] = mapped_column(String(128), nullable=False, comment="测试报告名称")
+    is_passed: Mapped[int] = mapped_column(Integer(), default=1, comment="是否全部通过，1全部通过，0有报错")
+    run_type: Mapped[str] = mapped_column(
+        String(255), default="task", nullable=True, comment="报告类型，task/suite/case/api")
+    status: Mapped[int] = mapped_column(Integer(), default=1, comment="当前节点是否执行完毕，1执行中，2执行完毕")
+    retry_count: Mapped[int] = mapped_column(Integer(), default=0, comment="已经执行重试的次数")
+    env: Mapped[str] = mapped_column(String(255), default="test", comment="运行环境")
+    temp_variables: Mapped[dict] = mapped_column(JSON, default={}, nullable=True, comment="临时参数")
+    process: Mapped[int] = mapped_column(Integer(), default=1, comment="进度节点, 1: 解析数据、2: 执行测试、3: 写入报告")
+    batch_id: Mapped[str] = mapped_column(String(128), index=True, comment="运行批次id，用于查询报告")
+    trigger_id: Mapped[Union[int, list, str]] = mapped_column(JSON, comment="运行id，用于触发重跑")
+    project_id: Mapped[int] = mapped_column(Integer(), nullable=False, index=True, comment="所属的服务id")
+    summary: Mapped[dict] = mapped_column(JSON, default={}, comment="报告的统计")
+
