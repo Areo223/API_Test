@@ -112,3 +112,22 @@ class DeleteApiForm(GetApiForm):
         if case_name:
             raise ValueError(f"用例【{case_name[0]}】已引用此接口，请先解除引用")
         return value
+
+class RunApiForm(BaseForm):
+    """ 运行接口 """
+    id_list: List[int] = Field(..., title="接口id列表",min_length=1)
+    env_list: List[str] = Field(..., title="运行环境",min_length=1)
+
+    @field_validator("id_list")
+    # 对id_list进行校验
+    def validate_id_list(self, value):
+        run_api_id_list_query = Api.db.session.query(Api.id).filter(Api.id.in_(value)).all()
+        run_api_id_list = [query[0] for query in run_api_id_list_query]
+        # if not run_api_id_list:接口不存在
+        self.validate_is_true(run_api_id_list, '接口不存在')
+        # 找到对应id的第一个接口名称和项目id
+        api_query = Api.db.session.query(Api.name, Api.project_id).filter(Api.id == run_api_id_list[0]).first()
+        setattr(self, 'run_api_id_list', run_api_id_list)
+        setattr(self, 'api_name', api_query[0])
+        setattr(self, 'project_id', api_query[1])
+        return value

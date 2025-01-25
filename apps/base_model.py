@@ -1,3 +1,5 @@
+import copy
+import time
 from contextlib import contextmanager
 from datetime import datetime
 from typing import Any, Self, Dict, Optional, Union
@@ -11,7 +13,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 from werkzeug.security import generate_password_hash
 
 from apps.enums import DataStatusEnum, ApiBodyTypeEnum, CaseStatusEnum, ApiCaseSuiteTypeEnum
+from utils.parse.parse import parse_list_to_dict, update_dict_to_list
 from utils.util.json_util import JsonUtil
+from config import _main_server_host
 
 
 class SQLAlchemy(_SQLAlchemy):
@@ -275,6 +279,96 @@ class BaseProject(StatusFiled,NumFiled):
     manager:Mapped[int] = mapped_column(Integer(),nullable=False,comment="负责人")
     business_id:Mapped[int] = mapped_column(Integer(),nullable=False,index=True,comment="业务线")
 
+class BaseProjectEnv(VariablesFiled):
+    """ 服务环境基类表 """
+    __abstract__ = True
+    # host自动获取主服务器的域名,世纪难题解决!
+    host: Mapped[str] = mapped_column(String(255), default=_main_server_host, comment="服务地址")
+    env_id: Mapped[int] = mapped_column(Integer(), index=True, nullable=False, comment="对应环境id")
+    project_id: Mapped[int] = mapped_column(Integer(), index=True, nullable=False, comment="所属的服务id")
+
+    @classmethod
+    def create_env(cls, project_env_model=None, run_env_model=None, project_id=None, env_list=None):
+        """
+        当环境配置更新时，自动给项目/环境增加环境信息
+        如果指定了项目id，则只更新该项目的id，否则更新所有项目的id
+        如果已有当前项目的信息，则用该信息创建到指定的环境
+        """
+        # 如果没有指定项目id，也没有指定环境列表，则不更新
+        if not project_id and not env_list:
+            return
+        # 如果指定了env_list就使用,如果没有就从run_env_model中获取
+        env_id_list = env_list or run_env_model.get_id_list()
+        # 如果指定了项目id，则只更新该项目的id，否则更新所有项目的id
+        if project_id:
+            # 获取当前项目
+            current_project_env = cls.get_first(project_id=project_id)
+            # 成功获取到当前项目，则使用该项目,否则使用默认信息
+            data = current_project_env.to_dict() if current_project_env else {"project_id": project_id}
+            # 最后得到的data是一个字典
+            new_env_data_list = []
+            # 对于每一个环境id
+            for env_id in env_id_list:
+                # 把环境id赋值给data字典的"env_id"
+                data["env_id"] = env_id
+                # deepcopy会递归地复制整个数据结构，创建出完全独立的副本
+                new_env_data_list.append(copy.deepcopy(data))
+            # 批量创建新的环境
+            cls.model_batch_create(new_env_data_list)
+
+        else:
+            for project_query_id in project_env_model.get_id_list():
+                cls.create_env(project_env_model, run_env_model, project_query_id, env_id_list)
+
+    @classmethod
+    def change_env(cls, form):
+        """ 修改环境 """
+        # 更新当前环境
+        form.project_env.model_update(form.model_dump())
+        # 更新环境的时候，把环境的头部信息、变量的key一并同步到其他环境
+        env_id_list_query = cls.db.session.query(cls.env_id).filter(
+            cls.project_id == form.project_id, cls.env_id != form.project_env.env_id).all()
+        cls.synchronization(form.project_env, [int(env_id[0]) for env_id in env_id_list_query])
+
+    @classmethod
+    def synchronization(cls, from_env, to_env_id_list: list):
+        """ 把当前环境同步到其他环境
+        from_env: 从哪个环境
+        to_env_list: 同步到哪些环境
+        """
+        # 同步数据来源
+        is_update_headers = hasattr(cls, "headers")
+        filed_list = ["variables", "headers"] if is_update_headers else ["variables"]
+
+        # 同步数据来源解析
+        from_env_dict = {}
+        for filed in filed_list:
+            from_env_dict[filed] = parse_list_to_dict(getattr(from_env, filed))
+
+        # 同步至指定环境
+        new_env_list = []
+        to_env_list = cls.db.session.query(cls.id, *[getattr(cls, filed) for filed in filed_list]).filter(
+            cls.project_id == from_env.project_id, cls.env_id.in_(to_env_id_list)).all()
+
+        for to_env_data in to_env_list:
+            new_env_data = {
+                "id": to_env_data[0],
+                "variables": update_dict_to_list(from_env_dict["variables"], to_env_data[1])
+            }
+            if is_update_headers:
+                new_env_data["headers"] = update_dict_to_list(from_env_dict["headers"], to_env_data[2])
+            new_env_list.append(new_env_data)
+        cls.batch_update(new_env_list)
+
+    @classmethod
+    def add_env(cls, env_id, project_model):
+        """ 新增运行环境时，批量给服务/项目/APP加上 """
+        data_list = []
+        for project_id in project_model.get_id_list():
+            if not cls.db.session.query(cls.id).filter_by(project_id=project_id, env_id=env_id).first():
+                data_list.append({"env_id": env_id, "project_id": project_id})
+        cls.model_batch_create(data_list)
+
 class BaseCase(VariablesFiled,StatusFiled,NumFiled,SkipIfFiled):
     __abstract__ = True
 
@@ -325,4 +419,91 @@ class BaseReport(BaseModel):
     trigger_id: Mapped[Union[int, list, str]] = mapped_column(JSON, comment="运行id，用于触发重跑")
     project_id: Mapped[int] = mapped_column(Integer(), nullable=False, index=True, comment="所属的服务id")
     summary: Mapped[dict] = mapped_column(JSON, default={}, comment="报告的统计")
+
+    @classmethod
+    def get_batch_id(cls):
+        """ 生成运行id """
+        return f'{g.user_id}_{int(time.time() * 1000000)}'
+
+    @staticmethod
+    def get_summary_template():
+        return {
+            "result": "success",
+            "stat": {
+                "test_case": {  # 用例维度
+                    "total": 0,  # 初始化的时候给个1，方便用户查看运行中的报告，后续会在流程中更新为实际的total
+                    "success": 0,
+                    "fail": 0,
+                    "error": 0,
+                    "skip": 0
+                },
+                "test_step": {  # 步骤维度
+                    "total": 0,
+                    "success": 0,
+                    "fail": 0,
+                    "error": 0,
+                    "skip": 0
+                },
+                "count": {  # 此次运行有多少接口/元素
+                    "api": 1,
+                    "step": 1,
+                    "element": 0
+                },
+                "response_time": {  # 记录步骤响应速度统计
+                    "slow": [],
+                    "very_slow": []
+                }
+            },
+            "time": {  # 时间维度
+                "start_at": "",
+                "end_at": "",
+                "step_duration": 0,  # 所有步骤的执行耗时，只统计请求耗时
+                "case_duration": 0,  # 所有用例下所有步骤执行耗时，只统计请求耗时
+                "all_duration": 0  # 开始执行 - 执行结束 整个过程的耗时，包含测试过程中的数据解析、等待...
+            },
+            "env": {  # 环境
+                "code": "",
+                "name": "",
+            }
+        }
+
+class BaseReportCase(BaseModel):
+    """ 用例执行记录基类表 """
+    __abstract__ = True
+
+    name: Mapped[str] = mapped_column(String(128), nullable=True, comment="测试用例名称")
+    case_id: Mapped[int] = mapped_column(Integer(), nullable=True, index=True, comment="执行记录对应的用例id")
+    suite_id: Mapped[int] = mapped_column(Integer(), nullable=True, default=None, comment="执行用例所在的用例集id")
+    report_id: Mapped[int] = mapped_column(Integer(), index=True, comment="测试报告id")
+    result: Mapped[str] = mapped_column(
+        String(128), default='waite',
+        comment="步骤测试结果，waite：等待执行、running：执行中、fail：执行不通过、success：执行通过、skip：跳过、error：报错")
+    case_data: Mapped[dict] = mapped_column(JSON, default={}, comment="用例的数据")
+    summary: Mapped[dict] = mapped_column(JSON, default={}, comment="用例的报告统计")
+    error_msg: Mapped[str] = mapped_column(Text(), default='', comment="用例错误信息")
+
+class BaseReportStep(BaseModel):
+    """ 步骤执行记录基类表 """
+    __abstract__ = True
+
+    name: Mapped[str] = mapped_column(String(128), nullable=True, comment="测试步骤名称")
+    case_id: Mapped[int] = mapped_column(Integer(), nullable=True, default=None, comment="步骤所在的用例id")
+    step_id: Mapped[int] = mapped_column(Integer(), nullable=True, index=True, default=None, comment="步骤id")
+    element_id: Mapped[int] = mapped_column(Integer(), comment="步骤对应的元素/接口id")
+    report_case_id: Mapped[int] = mapped_column(Integer(), index=True, nullable=True, default=None,
+                                                comment="用例数据id")
+    status: Mapped[str] = mapped_column(String(8), default="resume", comment="resume:放行、pause:暂停、stop:中断")
+    report_id: Mapped[int] = mapped_column(Integer(), index=True, comment="测试报告id")
+    process: Mapped[str] = mapped_column(
+        String(128), default='waite',
+        comment="步骤执行进度，waite：等待解析、parse: 解析数据、before：前置条件、after：后置条件、run：执行测试、extract：数据提取、validate：断言")
+    result: Mapped[str] = mapped_column(
+        String(128), default='waite',
+        comment="步骤测试结果，waite：等待执行、running：执行中、fail：执行不通过、success：执行通过、skip：跳过、error：报错")
+    step_data: Mapped[dict] = mapped_column(JSON, default={}, comment="步骤的数据")
+    summary: Mapped[dict] = mapped_column(
+        JSON, comment="步骤的统计",
+        default={"response_time_ms": 0, "elapsed_ms": 0, "content_size": 0, "request_at": "", "response_at": ""})
+
+
 

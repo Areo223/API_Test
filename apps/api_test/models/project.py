@@ -1,7 +1,7 @@
 
 from sqlalchemy.orm import Mapped, mapped_column
 
-from apps.base_model import BaseProject
+from apps.base_model import BaseProject, BaseProjectEnv, HeadersFiled
 from apps.enums import ProjectLastPullStatusEnum
 
 
@@ -17,3 +17,9 @@ class ApiProject(BaseProject):
 
     def last_pull_success(self):
         self.model_update({"last_pull_status":ProjectLastPullStatusEnum.SUCCESS})
+
+class ApiProjectEnv(BaseProjectEnv, HeadersFiled):
+    """ 服务环境表 """
+    __abstract__ = False
+    __tablename__ = "api_test_project_env"
+    __table_args__ = {"comment": "接口测试服务环境表"}

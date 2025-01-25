@@ -2,7 +2,9 @@ import os
 
 _basedir = os.path.abspath(".")
 _main_server_port = 8024  # 主服务端口
+_main_server_host = f'http://localhost:{_main_server_port}'  # 主程序后端服务
 _admin_default_password = "123456"  # 默认密码
+assert_mapping, assert_mapping_list = {}, []
 
 
 class _SystemConfig:
