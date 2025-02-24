@@ -17,9 +17,9 @@ class GetApiForm(BaseForm):
     id: int = Field(..., title="接口id")
 
     @field_validator('id')
-    def validate_id(self, value):
-        api = self.validate_data_is_exist("接口不存在",id=value)
-        setattr(self, 'api', api)
+    def validate_id(cls, value):
+        api = cls.validate_data_is_exist("接口不存在",id=value)
+        setattr(cls, 'api', api)
         return value
 
 class ChangeStatusForm(GetApiForm):
@@ -63,39 +63,39 @@ class ChangeApiForm(GetApiForm):
     response: Optional[Union[str, dict, list]] = Field({}, title="接口响应")
 
     @field_validator('headers')
-    def validate_headers(self, value):
+    def validate_headers(cls, value):
         """ 头部信息校验 """
-        self.validate_header_format([header.model_dump() for header in value], content_title='头部信息')
+        cls.validate_header_format([header.model_dump() for header in value], content_title='头部信息')
         return value
 
     @field_validator('params')
-    def validate_params(self, value):
+    def validate_params(cls, value):
         """ params信息校验 """
-        self.validate_header_format([params.model_dump() for params in value], content_title='url参数')
+        cls.validate_header_format([params.model_dump() for params in value], content_title='url参数')
         return value
 
     @field_validator('addr')
-    def validate_addr(self, value):
+    def validate_addr(cls, value):
         """ 接口地址校验 """
-        self.validate_is_true(value.split("?")[0], "接口地址不能为空")
+        cls.validate_is_true(value.split("?")[0], "接口地址不能为空")
         return value
 
     @field_validator('extracts')
-    def validate_extracts(self, value):
+    def validate_extracts(cls, value):
         """ 校验提取数据表达式 """
-        self.validate_api_extracts([extract.model_dump() for extract in value])
+        cls.validate_api_extracts([extract.model_dump() for extract in value])
         return value
 
     @field_validator('validates')
-    def validate_validates(self, value):
+    def validate_validates(cls, value):
         """ 校验断言表达式 """
-        self.validate_base_validates([validate.model_dump() for validate in value])
+        cls.validate_base_validates([validate.model_dump() for validate in value])
         return value
 
-    def depends_validate(self):
-        data_form_value = [data_form.model_dump() for data_form in self.data_form]
-        if self.body_type == ApiBodyTypeEnum.form.value:
-            self.validate_variable_format(data_form_value, msg_title='form-data')
+    def depends_validate(cls):
+        data_form_value = [data_form.model_dump() for data_form in cls.data_form]
+        if cls.body_type == ApiBodyTypeEnum.form.value:
+            cls.validate_variable_format(data_form_value, msg_title='form-data')
         return data_form_value
 
 class ChangeLevel(GetApiForm):
@@ -107,7 +107,7 @@ class ChangeLevel(GetApiForm):
 class DeleteApiForm(GetApiForm):
 
     @field_validator('id')
-    def validate_id(self, value):
+    def validate_id(cls, value):
         case_name = Api.db.session.query(Case.name).filter(Step.api_id == value).filter(Case.id == Step.case_id).first()
         if case_name:
             raise ValueError(f"用例【{case_name[0]}】已引用此接口，请先解除引用")
@@ -120,14 +120,14 @@ class RunApiForm(BaseForm):
 
     @field_validator("id_list")
     # 对id_list进行校验
-    def validate_id_list(self, value):
+    def validate_id_list(cls, value):
         run_api_id_list_query = Api.db.session.query(Api.id).filter(Api.id.in_(value)).all()
         run_api_id_list = [query[0] for query in run_api_id_list_query]
         # if not run_api_id_list:接口不存在
-        self.validate_is_true(run_api_id_list, '接口不存在')
+        cls.validate_is_true(run_api_id_list, '接口不存在')
         # 找到对应id的第一个接口名称和项目id
         api_query = Api.db.session.query(Api.name, Api.project_id).filter(Api.id == run_api_id_list[0]).first()
-        setattr(self, 'run_api_id_list', run_api_id_list)
-        setattr(self, 'api_name', api_query[0])
-        setattr(self, 'project_id', api_query[1])
+        setattr(cls, 'run_api_id_list', run_api_id_list)
+        setattr(cls, 'api_name', api_query[0])
+        setattr(cls, 'project_id', api_query[1])
         return value

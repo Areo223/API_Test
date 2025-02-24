@@ -17,15 +17,15 @@ def register_before_hooks(app):
           """
         g.user_id,g.user_name,g.api_permission,g.business_list = None,None,[],[]
 
-    @app.before_request
-    def parse_request():
-        """
-        第二个执行
-        解析请求。
-        从请求中获取用户信息，并将其设置到 g.user_id 和 g.user_name 中。
-        """
-        g.user_id = 1
-        g.user_name = "admin"
+    # @app.before_request
+    # def parse_request():
+    #     """
+    #     第二个执行
+    #     解析请求。
+    #     从请求中获取用户信息，并将其设置到 g.user_id 和 g.user_name 中。
+    #     """
+    #     g.user_id = 1
+    #     g.user_name = "admin"
 
     @app.before_request
     def set_request_id():

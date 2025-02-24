@@ -2,7 +2,7 @@ from threading import Thread
 
 from flask import current_app as app
 
-from apps.api_test.blueprint import api_test
+from ..blueprint import api_test
 from apps.api_test.forms.api import ApiListForm, ChangeStatusForm, GetApiForm, AddApiForm, ChangeApiForm, DeleteApiForm, \
     RunApiForm
 from ..model_factory import ApiMsg as Api,ApiReport as Report
